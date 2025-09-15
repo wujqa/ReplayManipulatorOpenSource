@@ -107,6 +107,7 @@
     <ClCompile Include="Features\CamPathsManager\CamPathsManager.cpp" />
     <ClCompile Include="Features\CarRotator\CarRotator.cpp" />
     <ClCompile Include="Features\Credits\Credits.cpp" />
+    <ClCompile Include="Features\Chat\FakeChatInterface.cpp" />
     <ClCompile Include="Features\CustomTextures\CustomTextures.cpp" />
     <ClCompile Include="Framework\EventDispatcher\BakkesModEventDispatcher.cpp" />
     <ClCompile Include="Framework\EventDispatcher\BmAdapter.cpp" />
@@ -152,6 +153,7 @@
     <ClInclude Include="Features\CamPathsManager\CamPathsManager.h" />
     <ClInclude Include="Features\CarRotator\CarRotator.h" />
     <ClInclude Include="Features\Credits\Credits.h" />
+    <ClInclude Include="Features\Chat\FakeChatInterface.h" />
     <ClInclude Include="Features\CustomTextures\CustomTextures.h" />
     <ClInclude Include="Framework\EventDispatcher\BakkesModEventDispatcher.h" />
     <ClInclude Include="Framework\EventDispatcher\BmAdapter.h" />
