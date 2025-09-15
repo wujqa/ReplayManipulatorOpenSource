@@ -1,11 +1,7 @@
-#include "pch.h"
 #include "ReplayManipulatorOpenSource.h"
+#include "pch.h"
 
-#include "ImguiUtils.h"
 #include "Data/PriData.h"
-#include "Features/TextureCache.h"
-#include "bakkesmod/utilities/LoadoutUtilities.h"
-#include "bakkesmod/wrappers/GameObject/MeshComponents/CarMeshComponentBaseWrapper.h"
 #include "Features/BallHide/BallHiderAndDecals.h"
 #include "Features/CamPathsManager/CamPathsManager.h"
 #include "Features/Camera/CameraFocus.h"
@@ -22,7 +18,11 @@
 #include "Features/ReplayManager/ReplayManager.h"
 #include "Features/SlowMotionTransitionFixer/Stfu.h"
 #include "Features/StadiumColors/StadiumManager.h"
+#include "Features/TextureCache.h"
 #include "Framework/GuiFeatureBase.h"
+#include "ImguiUtils.h"
+#include "bakkesmod/utilities/LoadoutUtilities.h"
+#include "bakkesmod/wrappers/GameObject/MeshComponents/CarMeshComponentBaseWrapper.h"
 
 BAKKESMOD_PLUGIN(ReplayManipulatorOpenSource, "write a plugin description here", plugin_version, PLUGINTYPE_FREEPLAY)
 
@@ -45,9 +45,9 @@ void ReplayManipulatorOpenSource::onLoad()
     auto custom_ball_decals_folder = gameWrapper->GetDataFolder() / "acplugin" / "BallTextures";
     ball_hider_ = CreateModule<BallHiderAndDecals>(gameWrapper, texture_cache_, custom_ball_decals_folder);
     player_rename_ = std::make_shared<PlayerRenamer>(gameWrapper);
-    dollycam_manager_ = CreateModule<CamPathsManager>(gameWrapper, cvarManager,
-                                                      gameWrapper->GetDataFolder() / "campaths");
+    dollycam_manager_ = CreateModule<CamPathsManager>(gameWrapper, cvarManager, gameWrapper->GetDataFolder() / "campaths");
     credits_ = CreateModule<CreditsInSettings>(gameWrapper);
+    chat_interface_ = CreateModule<FakeChatInterface>(gameWrapper);
 
     items_ = std::make_shared<Items>(gameWrapper);
     paint_finish_colors_ = std::make_shared<PaintFinishColors>();
@@ -64,9 +64,7 @@ void ReplayManipulatorOpenSource::onLoad()
         });
     });
 
-    gameWrapper->HookEvent("Function TAGame.GFxHUD_Replay_TA.Destroyed", [this](...) {
-        OnReplayClose();
-    });
+    gameWrapper->HookEvent("Function TAGame.GFxHUD_Replay_TA.Destroyed", [this](...) { OnReplayClose(); });
 
     if (gameWrapper->IsInReplay())
     {
@@ -79,9 +77,8 @@ void ReplayManipulatorOpenSource::onLoad()
 void ReplayManipulatorOpenSource::InitUtilityModules()
 {
     texture_cache_ = std::make_shared<TextureCache>(gameWrapper);
-    //event_dispatcher_ = std::make_shared<BakkesModEventDispatcher>(this);
+    // event_dispatcher_ = std::make_shared<BakkesModEventDispatcher>(this);
 }
-
 
 void ReplayManipulatorOpenSource::OnReplayOpen()
 {
@@ -110,43 +107,32 @@ void ReplayManipulatorOpenSource::OnReplayOpen()
     current_replay_id_ = replay_id;
     current_replay_name_ = replay.GetReplayName().ToString();
 
-    auto lodout_set_cb = [this](PriWrapper&& pri, void*, const std::string& name) {
-        OnPriLoadoutSet(pri);
-    };
+    auto lodout_set_cb = [this](PriWrapper&& pri, void*, const std::string& name) { OnPriLoadoutSet(pri); };
     gameWrapper->HookEventWithCaller<PriWrapper>("Function TAGame.PRI_TA.OnLoadoutsSetInternal", lodout_set_cb);
     gameWrapper->HookEventWithCaller<PriWrapper>("Function TAGame.PRI_TA.OnLoadoutsSet", lodout_set_cb);
     gameWrapper->HookEventWithCaller<PriWrapper>("Function TAGame.PRI_TA.HandleLoadoutLoaded", lodout_set_cb);
     gameWrapper->HookEventWithCaller<PriWrapper>("Function TAGame.PRI_TA.UpdateFromLoadout", lodout_set_cb);
 
     gameWrapper->HookEventWithCallerPost<ActorWrapper>("Function TAGame.CarMeshComponentBase_TA.InitMaterials",
-                                                       [this](const ActorWrapper& caller, ...) {
-                                                           OnMaterialInit(
-                                                               CarMeshComponentBaseWrapper{caller.memory_address});
-                                                       });
+                                                       [this](const ActorWrapper& caller, ...) { OnMaterialInit(CarMeshComponentBaseWrapper{caller.memory_address}); });
 
-    gameWrapper->HookEventWithCaller<CarWrapper>("Function TAGame.Car_TA.UpdateTeamLoadout",
-                                                 [this](CarWrapper&& car, ...) {
-                                                     if (auto pri = car.GetPRI())
-                                                     {
-                                                         OnPriLoadoutSet(pri);
-                                                     }
-                                                 });
-
-    gameWrapper->HookEventWithCaller<ActorWrapper>("Function TAGame.CarMeshComponentBase_TA.SetMeshMaterialColors",
-                                                   [this](ActorWrapper&& car_mesh, ...) {
-                                                       if (auto car = CarMeshComponentBaseWrapper(car_mesh.memory_address).GetCar())
-                                                       {
-                                                           OnSetMeshMaterialColors(car);
-                                                       }
-                                                   });
-
-    gameWrapper->HookEvent("Function TAGame.PlayerInput_TA.PlayerInput", [this](...) {
-        CameraLock();
+    gameWrapper->HookEventWithCaller<CarWrapper>("Function TAGame.Car_TA.UpdateTeamLoadout", [this](CarWrapper&& car, ...) {
+        if (auto pri = car.GetPRI())
+        {
+            OnPriLoadoutSet(pri);
+        }
     });
 
-    gameWrapper->SetTimeout([this](...) {
-        RefreshPriData();
-    }, 2);
+    gameWrapper->HookEventWithCaller<ActorWrapper>("Function TAGame.CarMeshComponentBase_TA.SetMeshMaterialColors", [this](ActorWrapper&& car_mesh, ...) {
+        if (auto car = CarMeshComponentBaseWrapper(car_mesh.memory_address).GetCar())
+        {
+            OnSetMeshMaterialColors(car);
+        }
+    });
+
+    gameWrapper->HookEvent("Function TAGame.PlayerInput_TA.PlayerInput", [this](...) { CameraLock(); });
+
+    gameWrapper->SetTimeout([this](...) { RefreshPriData(); }, 2);
 }
 
 void ReplayManipulatorOpenSource::OnReplayClose() const
@@ -163,18 +149,14 @@ void ReplayManipulatorOpenSource::OnReplayClose() const
 
 void ReplayManipulatorOpenSource::OnGameThread(std::function<void()>&& func) const
 {
-    gameWrapper->Execute([func = std::move(func)](...) {
-        func();
-    });
+    gameWrapper->Execute([func = std::move(func)](...) { func(); });
 }
 
 void ReplayManipulatorOpenSource::RenderSettings()
 {
     if (ImGui::Button("open window"))
     {
-        OnGameThread([this] {
-            cvarManager->executeCommand(std::format("openmenu {}", GetMenuName()));
-        });
+        OnGameThread([this] { cvarManager->executeCommand(std::format("openmenu {}", GetMenuName())); });
     }
     for (const auto& gui_feature_base : gui_features_)
     {
@@ -224,16 +206,28 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
 
     if (ImGui::Checkbox("Hidden", &pri.hidden))
     {
-        OnGameThread([this, pri]() mutable {
-            ApplyCarHiddenState(pri);
-        });
+        OnGameThread([this, pri]() mutable { ApplyCarHiddenState(pri); });
     }
     ImGui::SameLine();
     if (ImGui::Button("Focus camera"))
     {
-        OnGameThread([this, id = pri.uid.pri_id_string] {
-            camera_focus_->FocusCameraOnPlayer(id);
-        });
+        OnGameThread([this, id = pri.uid.pri_id_string] { camera_focus_->FocusCameraOnPlayer(id); });
+    }
+
+    static const char* bot_avatars[] = {"None", "Centurion", "Chipper", "Heater", "Yuri", "Scout", "Maverick", "Bandit", "Caveman", "Mountain"};
+    const char* current_avatar = pri.bot_avatar.empty() ? "None" : pri.bot_avatar.c_str();
+    if (ImGui::BeginCombo("Bot avatar", current_avatar))
+    {
+        for (auto* name : bot_avatars)
+        {
+            bool selected = pri.bot_avatar == name;
+            if (ImGui::Selectable(name, selected))
+            {
+                pri.bot_avatar = std::string{name} == "None" ? "" : name;
+                OnGameThread([this, pri] { ApplyBotAvatar(pri); });
+            }
+        }
+        ImGui::EndCombo();
     }
 
     auto loadout_changed = false;
@@ -262,9 +256,7 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
                 int& skin_id = pri.loadout.items[pluginsdk::Equipslot::DECAL].product_id;
                 if (body_id == pri.custom_decal.BodyID && skin_id == pri.custom_decal.SkinID)
                 {
-                    OnGameThread([this, &pri] {
-                        ApplyDecal(pri);
-                    });
+                    OnGameThread([this, &pri] { ApplyDecal(pri); });
                 }
                 else
                 {
@@ -370,9 +362,7 @@ void ReplayManipulatorOpenSource::RenderWindow()
 
 PriData* ReplayManipulatorOpenSource::GetPriData(PriWrapper& pri)
 {
-    const auto it = std::ranges::find_if(replay_players_, [pri](const PriData& p)mutable {
-        return p == pri;
-    });
+    const auto it = std::ranges::find_if(replay_players_, [pri](const PriData& p) mutable { return p == pri; });
     if (it != replay_players_.end())
     {
         return &(*it);
@@ -389,7 +379,7 @@ void ReplayManipulatorOpenSource::OnPriLoadoutSet(PriWrapper& pri)
     }
 
     auto car = pri.GetCar();
-    //if no car they're spectating. Don't care about those
+    // if no car they're spectating. Don't care about those
     if (!car)
     {
         return;
@@ -449,17 +439,16 @@ void ReplayManipulatorOpenSource::RefreshPriData()
         if (auto* pri_data = GetPriData(pri))
         {
             pri_data->Update(pri, *loadout);
+            ApplyBotAvatar(*pri_data);
         }
         else
         {
             replay_players_.emplace_back(pri, *loadout);
+            ApplyBotAvatar(replay_players_.back());
         }
     }
-    std::ranges::sort(replay_players_, [](PriData& a, PriData& b) {
-        return std::tie(a.team, a.player_name) < std::tie(b.team, b.player_name);
-    });
+    std::ranges::sort(replay_players_, [](PriData& a, PriData& b) { return std::tie(a.team, a.player_name) < std::tie(b.team, b.player_name); });
 }
-
 
 PriWrapper ReplayManipulatorOpenSource::GetPriWrapper(const PriData& pri_data) const
 {
@@ -521,6 +510,19 @@ void ReplayManipulatorOpenSource::ApplyDecal(const PriData& pri_data) const
     CustomTextures::ApplyDecalToCar(pri_data.custom_decal, car);
 }
 
+void ReplayManipulatorOpenSource::ApplyBotAvatar(const PriData& pri_data) const
+{
+    if (pri_data.bot_avatar.empty())
+    {
+        return;
+    }
+
+    if (auto pri_wrapper = GetPriWrapper(pri_data))
+    {
+        pri_wrapper.SetBotAvatar(pri_data.bot_avatar);
+    }
+}
+
 void ReplayManipulatorOpenSource::CameraLock() const
 {
     static auto left_alt_index = gameWrapper->GetFNameIndexByString("LeftAlt");
@@ -537,11 +539,11 @@ void ReplayManipulatorOpenSource::CameraLock() const
         pc.SetALookUp(0);
         pc.SetATurn(0);
 
-        //if (const auto* real_pc = UCast<APlayerController>(gw_->GetPlayerController()))
+        // if (const auto* real_pc = UCast<APlayerController>(gw_->GetPlayerController()))
         //{
         //	auto* pi = real_pc->PlayerInput;
         //	pi->ResetInput();
-        //}
+        // }
     }
 }
 

@@ -1,6 +1,6 @@
 #pragma once
-#include "PriUid.h"
 #include "Features/CustomTextures/CustomTextures.h"
+#include "PriUid.h"
 #include "bakkesmod/core/loadout_structs.h"
 
 struct Loadout;
@@ -22,6 +22,7 @@ struct PriData
     bool hidden = false;
     bool spectating = false;
     int team = 0;
+    std::string bot_avatar;
 
     pluginsdk::Loadout loadout;
     CustomDecal custom_decal;

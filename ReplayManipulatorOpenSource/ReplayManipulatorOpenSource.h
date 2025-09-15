@@ -1,19 +1,19 @@
 #pragma once
 
 #include <memory>
-#include <memory>
 
-#include "GuiBase.h"
 #include "Data/PriData.h"
+#include "GuiBase.h"
 #include "bakkesmod/plugin/bakkesmodplugin.h"
 
-#include "version.h"
 #include "Features/CamPathsManager/CamPathsManager.h"
+#include "Features/Chat/FakeChatInterface.h"
 #include "Features/Credits/Credits.h"
 #include "Features/CustomTextures/CustomTextures.h"
+#include "version.h"
 
-#include <memory>
 #include <bakkesmod/wrappers/GameObject/MeshComponents/CarMeshComponentBaseWrapper.h>
+#include <memory>
 
 class GuiFeatureBase;
 class PlayerRenamer;
@@ -28,27 +28,26 @@ class CameraFocus;
 class LoadoutEditor;
 class Items;
 class ReplayManager;
+class FakeChatInterface;
 
 // ReSharper disable once CppInconsistentNaming
-constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "."
-    stringify(VERSION_BUILD);
+constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
-
-class ReplayManipulatorOpenSource
-    : public BakkesMod::Plugin::BakkesModPlugin
-      , public SettingsWindowBase // Uncomment if you wanna render your own tab in the settings menu
-      , public PluginWindowBase   // Uncomment if you want to render your own plugin window
+class ReplayManipulatorOpenSource : public BakkesMod::Plugin::BakkesModPlugin,
+                                    public SettingsWindowBase // Uncomment if you wanna render your own tab in the settings menu
+    ,
+                                    public PluginWindowBase // Uncomment if you want to render your own plugin window
 {
-public:
-    //std::shared_ptr<bool> enabled;
+  public:
+    // std::shared_ptr<bool> enabled;
 
-    //Boilerplate
+    // Boilerplate
     void onLoad() override;
 
     void OnReplayOpen();
     void OnReplayClose() const;
 
-    //void onUnload() override; // Uncomment and implement if you need a unload method
+    // void onUnload() override; // Uncomment and implement if you need a unload method
 
     void OnGameThread(std::function<void()>&& func) const;
 
@@ -63,13 +62,14 @@ public:
     [[nodiscard]] PriWrapper GetPriWrapper(const PriData& pri_data) const;
     void UpdateLoadout(const PriData& pri_data) const;
     void ApplyDecal(const PriData& pri_data) const;
+    void ApplyBotAvatar(const PriData& pri_data) const;
     void CameraLock() const;
     void ApplyCarHiddenState(const PriData& pri_data) const;
     void OnMaterialInit(const CarMeshComponentBaseWrapper& car_mesh_component);
     void OnSetMeshMaterialColors(CarWrapper& car_wrapper);
 
-private:
-    //std::shared_ptr<BakkesModEventDispatcher> event_dispatcher_;
+  private:
+    // std::shared_ptr<BakkesModEventDispatcher> event_dispatcher_;
 
     // Plugin data
     std::vector<PriData> replay_players_;
@@ -83,10 +83,8 @@ private:
     TextureJson custom_decal_configs_;
     void ReadJsons();
 
-
     // modules
-    template <typename T, typename... Args>
-    [[nodiscard]] std::shared_ptr<T> CreateModule(Args&&... args)
+    template <typename T, typename... Args> [[nodiscard]] std::shared_ptr<T> CreateModule(Args&&... args)
     {
         std::shared_ptr<T> created = std::make_shared<T>(std::forward<Args>(args)...);
         if (auto gui_feature = std::dynamic_pointer_cast<GuiFeatureBase>(created))
@@ -115,4 +113,5 @@ private:
     std::shared_ptr<TextureCache> texture_cache_;
     std::shared_ptr<CamPathsManager> dollycam_manager_;
     std::shared_ptr<CreditsInSettings> credits_;
+    std::shared_ptr<FakeChatInterface> chat_interface_;
 };

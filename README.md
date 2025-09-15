@@ -12,6 +12,8 @@
 - Change maps (Thumbnail feature had to be dropped in the rewrite)
 - Change stadium colors
 - Hide the ball
+- Insert custom chat messages at specific replay timestamps
+- Assign classic Rocket League bot profile pictures to any player
 
 ## Building 
 - This project uses vcpkg for it's 3rd-part dependencies. You will have to install this and integrate this with visual studio. [See here for a quick start on vcpkg](https://github.com/microsoft/vcpkg#quick-start-windows)
